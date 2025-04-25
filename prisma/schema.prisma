@@ -6,10 +6,64 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model Video {
+  id        Int         @id @default(autoincrement())
+  filename  String
+  filePath  String
+  duration  Float
+  size      Int
+  status    VideoStatus
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  trims     Trim[]
+  subtitles Subtitle[]
+  renders   Render[]
+}
+
+model Trim {
+  id        Int   @id @default(autoincrement())
+  startTime Float
+  endTime   Float
+  videoId   Int
+  video     Video @relation(fields: [videoId], references: [id])
+}
+
+model Subtitle {
+  id        Int    @id @default(autoincrement())
+  text      String
+  startTime Float
+  endTime   Float
+  videoId   Int
+  video     Video  @relation(fields: [videoId], references: [id])
+}
+
+model Render {
+  id         Int          @id @default(autoincrement())
+  status     RenderStatus
+  outputPath String
+  videoId    Int
+  video      Video        @relation(fields: [videoId], references: [id])
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+enum VideoStatus {
+  UPLOADED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum RenderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
 }
