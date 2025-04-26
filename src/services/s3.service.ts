@@ -1,4 +1,8 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import {
   AWS_ACCESS_KEY_ID,
   AWS_REGION,
@@ -14,15 +18,24 @@ const s3 = new S3Client({
   },
 });
 
+function getFile(key: string) {
+  const params = {
+    Bucket: AWS_S3_BUCKET_NAME,
+    Key: key,
+  };
+
+  return s3.send(new GetObjectCommand(params));
+}
+
 function uploadFile(key: string, body: any, contentType: string) {
-  const uploadParams = {
+  const params = {
     Bucket: AWS_S3_BUCKET_NAME,
     Key: key,
     Body: body,
     ContentType: contentType,
   };
 
-  return s3.send(new PutObjectCommand(uploadParams));
+  return s3.send(new PutObjectCommand(params));
 }
 
 function constructUrl(key: string) {
@@ -30,6 +43,7 @@ function constructUrl(key: string) {
 }
 
 const s3Service = {
+  getFile,
   uploadFile,
   constructUrl,
 };

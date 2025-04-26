@@ -12,8 +12,28 @@ export const getVideoMetadata = (filePath: string) => {
   });
 };
 
+export const trimVideo = async (
+  inputFilePath: string,
+  outputFilePath: string,
+  startSeconds: number,
+  duration: number
+) => {
+  // Trim the video using FFmpeg
+  await new Promise((resolve, reject) => {
+    ffmpeg(inputFilePath)
+      .setStartTime(startSeconds)
+      .setDuration(duration)
+      .output(outputFilePath)
+      .on("end", resolve)
+      .on("error", reject)
+      .run();
+  });
+
+  return;
+};
 const ffmpegService = {
   getVideoMetadata,
+  trimVideo,
 };
 
 export default ffmpegService;
