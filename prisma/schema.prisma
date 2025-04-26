@@ -14,44 +14,51 @@ datasource db {
 }
 
 model Video {
-  id        Int         @id @default(autoincrement())
-  filename  String
-  filePath  String
-  duration  Float
-  size      Int
-  status    VideoStatus
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  trims     Trim[]
-  subtitles Subtitle[]
-  renders   Render[]
+  id          String      @id @default(uuid()) @db.Uuid
+  filename    String
+  filePath    String
+  duration    Float
+  size        Int
+  contentType String
+  status      VideoStatus
+  trims       Trim[]
+  subtitles   Subtitle[]
+  renders     Render[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 }
 
 model Trim {
-  id        Int   @id @default(autoincrement())
-  startTime Float
-  endTime   Float
-  videoId   Int
-  video     Video @relation(fields: [videoId], references: [id])
+  id             String   @id @default(uuid()) @db.Uuid
+  startTime      Float
+  endTime        Float
+  videoId        String   @db.Uuid
+  trimmedVideoId String   @db.Uuid
+  video          Video    @relation(fields: [videoId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Subtitle {
-  id        Int    @id @default(autoincrement())
+  id        String   @id @default(uuid()) @db.Uuid
   text      String
   startTime Float
   endTime   Float
-  videoId   Int
-  video     Video  @relation(fields: [videoId], references: [id])
+  videoId   String   @db.Uuid
+  video     Video    @relation(fields: [videoId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Render {
-  id         Int          @id @default(autoincrement())
-  status     RenderStatus
-  outputPath String
-  videoId    Int
-  video      Video        @relation(fields: [videoId], references: [id])
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  id              String       @id @default(uuid()) @db.Uuid
+  status          RenderStatus
+  outputPath      String
+  videoId         String       @db.Uuid
+  renderedVideoId String       @db.Uuid
+  video           Video        @relation(fields: [videoId], references: [id])
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 }
 
 enum VideoStatus {
