@@ -4,11 +4,11 @@ import express from "express";
 import fs from "fs";
 import videoUploadMiddleware from "../middlewares/upload.middleware";
 import prismaClient from "../prisma/client";
-import ffmpegService from "../services/ffmpeg.service";
+import ffmpegService, { generateSRT } from "../services/ffmpeg.service";
 import s3Service from "../services/s3.service";
 import path from "path";
 import { Readable } from "stream";
-import { downloadDir, trimsDir } from "../config/fs.config";
+import { downloadDir, subbedDir, subsDir, trimsDir } from "../config/fs.config";
 
 const videoRouter = express.Router();
 
@@ -105,14 +105,7 @@ videoRouter.post("/:id/trim", async (req, res) => {
     const outputFileName = `trimmed_${Date.now()}_${video.filename}`;
     const outputFilePath = path.join(trimsDir, outputFileName);
 
-    const data = await s3Service.getFile(s3Key);
-    const writeStream = fs.createWriteStream(inputFilePath);
-    (data.Body as Readable)?.pipe(writeStream);
-
-    await new Promise<void>((resolve, reject) => {
-      writeStream.on("finish", resolve);
-      writeStream.on("error", reject);
-    });
+    await s3Service.saveFile(s3Key, inputFilePath);
 
     await ffmpegService.trimVideo(
       inputFilePath,
@@ -162,6 +155,91 @@ videoRouter.post("/:id/trim", async (req, res) => {
   } catch (error) {
     console.error("Error trimming video:", error);
     res.status(500).json({ error: "Failed to trim video" });
+  }
+});
+
+videoRouter.post("/:id/subtitles", async (req, res) => {
+  const { id } = req.params;
+  const { subtitles } = req.body; // Expecting an array of { text, startTime, endTime }
+
+  if (!subtitles || !Array.isArray(subtitles)) {
+    res.status(400).json({ error: "Invalid subtitles data." });
+    return;
+  }
+
+  try {
+    // Generate SRT content
+    const srtContent = generateSRT(subtitles);
+    const srtPath = path.join(subsDir, `subtitles_${Date.now()}.srt`);
+    fs.writeFileSync(srtPath, srtContent);
+
+    // Retrieve video metadata from the database
+    const video = await prismaClient.video.findUnique({
+      where: { id },
+    });
+    if (!video) {
+      res.status(404).json({ error: "Video not found." });
+      return;
+    }
+
+    const s3Key = video.filePath.split(".com/")[1];
+    const inputFilePath = path.join(
+      downloadDir,
+      `${video.id}_${video.filename}`
+    );
+    const outputFileName = `subbed_${Date.now()}_${video.filename}`;
+    const outputFilePath = path.join(subbedDir, outputFileName);
+
+    await s3Service.saveFile(s3Key, inputFilePath);
+
+    await ffmpegService.addSubtitlesToVideo(
+      inputFilePath,
+      outputFilePath,
+      srtPath
+    );
+
+    // Upload the subbed video to S3
+    const subbedS3Key = `videos/${outputFileName}`;
+    const fileStream = fs.createReadStream(outputFilePath);
+
+    await s3Service.uploadFile(subbedS3Key, fileStream, video.contentType);
+
+    const s3Url = s3Service.constructUrl(subbedS3Key);
+
+    // Save the subbed video metadata to the database
+    const subbedVideo = await prismaClient.video.create({
+      data: {
+        filename: outputFileName,
+        filePath: s3Url,
+        duration: video.duration,
+        size: fs.statSync(outputFilePath).size,
+        contentType: video.contentType,
+        status: VideoStatus.UPLOADED,
+      },
+    });
+
+    const subs = await prismaClient.subtitle.createMany({
+      data: subtitles.map((subtitle) => ({
+        text: subtitle.text,
+        startTime: subtitle.startTime,
+        endTime: subtitle.endTime,
+        videoId: subbedVideo.id,
+      })),
+    });
+
+    // Clean up temporary files
+    fs.unlinkSync(srtPath);
+    fs.unlinkSync(inputFilePath);
+    fs.unlinkSync(outputFilePath);
+
+    res.status(200).json({
+      message: "Subtitles added successfully.",
+      video: subbedVideo,
+      subtitles: subs,
+    });
+  } catch (error) {
+    console.error("Error adding subtitles:", error);
+    res.status(500).json({ error: "Failed to add subtitles." });
   }
 });
 

@@ -78,6 +78,4 @@ build/
 .DS_Store
 Thumbs.db
 
-uploads
-rendered
 temp

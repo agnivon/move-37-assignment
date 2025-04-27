@@ -9,6 +9,8 @@ import {
   AWS_S3_BUCKET_NAME,
   AWS_SECRET_ACCESS_KEY,
 } from "../config/aws.config";
+import fs from "fs";
+import { Readable } from "stream";
 
 const s3 = new S3Client({
   region: AWS_REGION,
@@ -42,9 +44,21 @@ function constructUrl(key: string) {
   return `https://${AWS_S3_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${key}`;
 }
 
+async function saveFile(key: string, path: string) {
+  const data = await getFile(key);
+  const writeStream = fs.createWriteStream(path);
+  (data.Body as Readable)?.pipe(writeStream);
+
+  await new Promise<void>((resolve, reject) => {
+    writeStream.on("finish", resolve);
+    writeStream.on("error", reject);
+  });
+}
+
 const s3Service = {
   getFile,
   uploadFile,
+  saveFile,
   constructUrl,
 };
 export default s3Service;
