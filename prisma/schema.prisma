@@ -53,9 +53,9 @@ model Subtitle {
 model Render {
   id              String       @id @default(uuid()) @db.Uuid
   status          RenderStatus
-  outputPath      String
+  outputPath      String?
   videoId         String       @db.Uuid
-  renderedVideoId String       @db.Uuid
+  renderedVideoId String?      @db.Uuid
   video           Video        @relation(fields: [videoId], references: [id])
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
