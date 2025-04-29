@@ -1,14 +1,14 @@
 // src/routes/video.routes.js
-import { VideoStatus } from "@prisma/client";
+import { RenderStatus, VideoStatus } from "@prisma/client";
 import express from "express";
 import fs from "fs";
+import path from "path";
+import { downloadDir, subbedDir, subsDir, trimsDir } from "../config/fs.config";
 import videoUploadMiddleware from "../middlewares/upload.middleware";
 import prismaClient from "../prisma/client";
 import ffmpegService, { generateSRT } from "../services/ffmpeg.service";
 import s3Service from "../services/s3.service";
-import path from "path";
-import { Readable } from "stream";
-import { downloadDir, subbedDir, subsDir, trimsDir } from "../config/fs.config";
+import { videoRenderQueue } from "../queues/video.queue";
 
 const videoRouter = express.Router();
 
@@ -68,7 +68,7 @@ videoRouter.post("/:id/trim", async (req, res) => {
   const { id } = req.params;
   const { startTime, endTime } = req.body;
 
-  if (!startTime || !endTime) {
+  if (startTime === undefined || endTime === undefined) {
     res.status(400).json({ error: "startTime and endTime are required." });
     return;
   }
@@ -115,7 +115,7 @@ videoRouter.post("/:id/trim", async (req, res) => {
     );
 
     // Upload the trimmed video to S3
-    const trimmedS3Key = `videos/${outputFileName}`;
+    const trimmedS3Key = `videos/trimmed/${outputFileName}`;
     const fileStream = fs.createReadStream(outputFilePath);
 
     await s3Service.uploadFile(trimmedS3Key, fileStream, video.contentType);
@@ -199,22 +199,20 @@ videoRouter.post("/:id/subtitles", async (req, res) => {
     );
 
     // Upload the subbed video to S3
-    const subbedS3Key = `videos/${outputFileName}`;
+    // const subbedS3Key = `videos/subbed/${outputFileName}`;
     const fileStream = fs.createReadStream(outputFilePath);
 
-    await s3Service.uploadFile(subbedS3Key, fileStream, video.contentType);
+    await s3Service.uploadFile(s3Key, fileStream);
 
-    const s3Url = s3Service.constructUrl(subbedS3Key);
+    const s3Url = s3Service.constructUrl(s3Key);
 
     // Save the subbed video metadata to the database
-    const subbedVideo = await prismaClient.video.create({
+    const subbedVideo = await prismaClient.video.update({
+      where: {
+        id,
+      },
       data: {
-        filename: outputFileName,
-        filePath: s3Url,
-        duration: video.duration,
         size: fs.statSync(outputFilePath).size,
-        contentType: video.contentType,
-        status: VideoStatus.UPLOADED,
       },
     });
 
@@ -241,6 +239,21 @@ videoRouter.post("/:id/subtitles", async (req, res) => {
     console.error("Error adding subtitles:", error);
     res.status(500).json({ error: "Failed to add subtitles." });
   }
+});
+
+videoRouter.post("/:id/render", async (req, res) => {
+  const { id } = req.params;
+
+  const render = await prismaClient.render.create({
+    data: { videoId: id, status: RenderStatus.PENDING },
+  });
+
+  videoRenderQueue.add(render.id, { videoId: id });
+
+  res.json({
+    videoId: id,
+    render,
+  });
 });
 
 export default videoRouter;

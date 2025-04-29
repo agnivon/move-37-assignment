@@ -29,7 +29,7 @@ function getFile(key: string) {
   return s3.send(new GetObjectCommand(params));
 }
 
-function uploadFile(key: string, body: any, contentType: string) {
+function uploadFile(key: string, body: any, contentType?: string) {
   const params = {
     Bucket: AWS_S3_BUCKET_NAME,
     Key: key,

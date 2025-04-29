@@ -11,7 +11,9 @@ export const subsDir = "./temp/subs";
 
 export const subbedDir = "./temp/subbed";
 
-const dirs = [uploadDir, downloadDir, trimsDir, subsDir, subbedDir];
+export const renderDir = "./temp/render";
+
+const dirs = [uploadDir, downloadDir, trimsDir, subsDir, subbedDir, renderDir];
 dirs.forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });

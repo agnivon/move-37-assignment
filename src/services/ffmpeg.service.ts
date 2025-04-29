@@ -1,4 +1,5 @@
 import ffmpeg from "fluent-ffmpeg";
+import { renderDir } from "../config/fs.config";
 
 export const getVideoMetadata = (filePath: string) => {
   return new Promise<ffmpeg.FfprobeData>((resolve, reject) => {
@@ -73,11 +74,50 @@ export const addSubtitlesToVideo = (
   });
 };
 
+/* export const joinVideos = (fileListPath: string, outputFilePath: string) => {
+  return new Promise<void>((resolve, reject) => {
+    ffmpeg()
+      .input(fileListPath)
+      .inputOptions(["-f", "concat", "-safe", "0"])
+      .outputOptions(["-c", "copy"])
+      .output(outputFilePath)
+      .on("end", () => {
+        resolve();
+      })
+      .on("error", (err) => {
+        reject();
+      })
+      .run();
+  });
+}; */
+
+export const joinVideos = (filePathList: string[], outputFilePath: string) => {
+  // Initialize ffmpeg command
+  let command = ffmpeg();
+
+  // Add each video file as input
+  filePathList.forEach((file) => {
+    command = command.input(file);
+  });
+
+  return new Promise<void>((resolve, reject) => {
+    command
+      .on("end", () => {
+        resolve();
+      })
+      .on("error", (err) => {
+        reject();
+      })
+      .mergeToFile(outputFilePath, renderDir);
+  });
+};
+
 const ffmpegService = {
   getVideoMetadata,
   trimVideo,
   generateSRT,
   addSubtitlesToVideo,
+  joinVideos,
 };
 
 export default ffmpegService;
