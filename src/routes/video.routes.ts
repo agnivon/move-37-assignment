@@ -256,4 +256,30 @@ videoRouter.post("/:id/render", async (req, res) => {
   });
 });
 
+videoRouter.get("/:id/download", async (req, res) => {
+  const { id } = req.params;
+
+  // Retrieve video metadata from the database
+  const video = await prismaClient.video.findUnique({
+    where: { id },
+  });
+  if (!video) {
+    res.status(404).json({ error: "Video not found." });
+    return;
+  }
+
+  // Download the video from S3
+  const s3Key = video.filePath.split(".com/")[1];
+  const filePath = path.join(downloadDir, `${video.id}_${video.filename}`);
+  await s3Service.saveFile(s3Key, filePath);
+
+  // Send the file as a response
+  res.download(filePath, (err) => {
+    if (err) {
+      console.error("Error downloading video:", err);
+    }
+    fs.unlinkSync(filePath); // Clean up the local file after download
+  });
+});
+
 export default videoRouter;
